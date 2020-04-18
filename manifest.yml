@@ -1,0 +1,36 @@
+applications:
+- name: codimd
+  memory: 128m
+  disk_quota: 2g
+  timeout: 180
+  docker:
+    image: making/codimd:2.0.1
+  services:
+  # cf create-service elephantsql turtle codimd-db (PWS only)
+  # or
+  # cf create-user-provided-service codimd-db -p "{\"uri\": \"postgres://user:pass@hostname:port/dbname\"}"
+  # or
+  # cf create-service credhub default codimd-db -c "{\"uri\": \"postgres://user:pass@hostname:port/dbname\"}"
+  - codimd-db
+  # cf create-user-provided-service azure-blob -p "{\"container\": \"...\", \"connection_string\": \"...\"}"
+  # or
+  # cf create-service credhub default azure-blob -c "{\"container\": \"...\", \"connection_string\": \"...\"}"
+  - azure-blob  
+  # cf create-user-provided-service bitbucket-oauth -p "{\"client_id\": \"...\", \"client_secret\": \"...\"}"
+  # or
+  # cf create-service credhub default bitbucket-oauth -c "{\"client_id\": \"...\", \"client_secret\": \"...\"}" 
+  - bitbucket-oauth
+  env:
+    CMD_EMAIL: false
+    CMD_ALLOW_EMAIL_REGISTER: false
+    CMD_PROTOCOL_USESSL: true
+  command: |
+    set -e
+    export SERVICES="$(python -c "import os,json,itertools;print(json.dumps(dict([(s['name'],s['credentials']) for s in list(itertools.chain.from_iterable(json.loads(os.environ['VCAP_SERVICES']).values()))])))")"
+    export CMD_DB_URL=$(python -c "import os,json;print(json.loads(os.environ['SERVICES'])['codimd-db']['uri'])")
+    export CMD_AZURE_CONTAINER=$(python -c "import os,json;print(json.loads(os.environ['SERVICES'])['azure-blob']['container'])")
+    export CMD_AZURE_CONNECTION_STRING=$(python -c "import os,json;print(json.loads(os.environ['SERVICES'])['azure-blob']['connection_string'])")
+    export CMD_BITBUCKET_CLIENTID=$(python -c "import os,json;print(json.loads(os.environ['SERVICES'])['bitbucket-oauth']['client_id'])")
+    export CMD_BITBUCKET_CLIENTSECRET=$(python -c "import os,json;print(json.loads(os.environ['SERVICES'])['bitbucket-oauth']['client_secret'])")
+    export CMD_DOMAIN=$(python -c "import os,json;print(json.loads(os.environ['VCAP_APPLICATION'])['uris'][0])")
+    /home/hackmd/app/docker-entrypoint.sh
